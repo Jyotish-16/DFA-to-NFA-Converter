@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NFA to DFA Converter - Subset Construction</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    h1 { text-align: center; color: #333; }
+    h2 { color: #444; border-bottom: 2px solid #888; padding-bottom: 5px; margin-top: 30px; }
+    h3 { color: #555; margin-top: 20px; }
+    .section { background: #fff; padding: 20px; margin: 15px 0; border: 1px solid #ccc; border-radius: 5px; }
+    label { font-weight: bold; margin-right: 8px; }
+    input[type="number"], input[type="text"] { padding: 5px 8px; margin: 5px; border: 1px solid #aaa; border-radius: 3px; width: 60px; }
+    input[type="text"] { width: 120px; }
+    button { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: #4CAF50; color: white; }
+    .btn-primary:hover { background: #45a049; }
+    .btn-convert { background: #2196F3; color: white; font-size: 16px; padding: 10px 30px; }
+    .btn-convert:hover { background: #1976D2; }
+    .btn-test { background: #FF9800; color: white; }
+    .btn-test:hover { background: #F57C00; }
+    table { border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #999; padding: 8px 12px; text-align: center; min-width: 80px; }
+    th { background: #e0e0e0; font-weight: bold; }
+    td input[type="text"] { border: 1px solid #ccc; width: 100px; text-align: center; padding: 4px; }
+    .final-check { margin: 0 5px; }
+    .result-accepted { color: green; font-weight: bold; font-size: 16px; }
+    .result-rejected { color: red; font-weight: bold; font-size: 16px; }
+    .step-box { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 3px; }
+    .step-box strong { color: #2196F3; }
+    .info { background: #e3f2fd; border: 1px solid #90CAF9; padding: 10px; border-radius: 4px; margin: 10px 0; color: #1565C0; }
+    .error { background: #ffebee; border: 1px solid #ef9a9a; padding: 10px; border-radius: 4px; margin: 10px 0; color: #c62828; }
+    .highlight { background: #fff9c4; }
+    canvas { border: 1px solid #ccc; background: #fff; margin: 10px 0; display: block; }
+    .flex-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+  </style>
+</head>
+<body>
+
+  <h1>NFA to DFA Converter</h1>
+  <p style="text-align:center; color:#666;">Subset Construction (Rabin-Scott) Algorithm Visualizer</p>
+
+  <!-- STEP 1 -->
+  <div class="section">
+    <h2>Step 1: Define NFA</h2>
+    <div class="flex-row">
+      <label>Number of States:</label>
+      <input type="number" id="numStates" min="1" max="20" value="3">
+      <label>Input Symbols (comma separated):</label>
+      <input type="text" id="inputSymbols" value="a,b" style="width:150px;">
+      <label><input type="checkbox" id="hasEpsilon"> Include ε (epsilon) transitions</label>
+      <button class="btn-primary" onclick="generateNFATable()">Generate NFA Table</button>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="section" id="nfaSection" style="display:none;">
+    <h2>Step 2: Fill NFA Transition Table</h2>
+    <div class="info">
+      <strong>Instructions:</strong> Fill in the transition table below. For multiple destination states, separate with commas (e.g., <code>q0,q1</code>). Leave empty or type <code>-</code> for no transition.
+    </div>
+    <h3>Select Start State & Final States</h3>
+    <div class="flex-row">
+      <label>Start State:</label>
+      <select id="startState"></select>
+    </div>
+    <div class="flex-row" id="finalStatesRow">
+      <label>Final States:</label>
+    </div>
+    <h3>NFA Transition Table (δ)</h3>
+    <div id="nfaTableArea"></div>
+    <br>
+    <button class="btn-convert" onclick="convertNFAtoDFA()">⚡ Convert NFA → DFA</button>
+  </div>
+
+  <!-- NFA Diagram -->
+  <div class="section" id="nfaDiagramSection" style="display:none;">
+    <h2>NFA State Diagram</h2>
+    <canvas id="nfaDiagram" width="750" height="400"></canvas>
+  </div>
+
+  <!-- Steps -->
+  <div class="section" id="stepsSection" style="display:none;">
+    <h2>Step 3: Subset Construction — Step by Step</h2>
+    <div id="stepsArea"></div>
+  </div>
+
+  <!-- DFA Table -->
+  <div class="section" id="dfaSection" style="display:none;">
+    <h2>Step 4: Resulting DFA Transition Table</h2>
+    <div id="dfaTableArea"></div>
+  </div>
+
+  <!-- DFA Diagram -->
+  <div class="section" id="dfaDiagramSection" style="display:none;">
+    <h2>DFA State Diagram</h2>
+    <canvas id="dfaDiagram" width="750" height="450"></canvas>
+  </div>
+
+  <!-- Test String -->
+  <div class="section" id="testSection" style="display:none;">
+    <h2>Step 5: Test a String</h2>
+    <div class="flex-row">
+      <label>Enter string:</label>
+      <input type="text" id="testStringInput" placeholder="e.g. aab" style="width:200px;">
+      <button class="btn-test" onclick="testString()">Test on NFA & DFA</button>
+    </div>
+    <div id="testResultArea"></div>
+  </div>
+
+<script>
+// ===== GLOBAL DATA =====
+let nfaStates = [];
+let nfaSymbols = [];
+let nfaHasEpsilon = false;
+let nfaStartState = '';
+let nfaFinalStates = [];
+let nfaTransitions = {};
+let dfaResult = null;
+
+// ===== STEP 1: GENERATE TABLE =====
+function generateNFATable() {
+  const n = parseInt(document.getElementById('numStates').value);
+  const symStr = document.getElementById('inputSymbols').value.trim();
+  nfaHasEpsilon = document.getElementById('hasEpsilon').checked;
+
+  if (n < 1 || n > 20) { alert('States: 1–20'); return; }
+  if (!symStr) { alert('Enter symbols'); return; }
+
+  nfaSymbols = symStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  if (!nfaSymbols.length) { alert('Enter valid symbols'); return; }
+
+  nfaStates = [];
+  for (let i = 0; i < n; i++) nfaStates.push('q' + i);
+  nfaTransitions = {};
+
+  let allSym = [...nfaSymbols];
+  if (nfaHasEpsilon) allSym.push('ε');
+
+  // Start state dropdown
+  const sel = document.getElementById('startState');
+  sel.innerHTML = '';
+  nfaStates.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+
+  // Final state checkboxes
+  const row = document.getElementById('finalStatesRow');
+  row.innerHTML = '<label>Final States:</label>';
+  nfaStates.forEach(s => {
+    const l = document.createElement('label');
+    l.innerHTML = '<input type="checkbox" class="final-check" value="' + s + '"> ' + s + '  ';
+    row.appendChild(l);
+  });
+
+  // Transition table
+  let html = '<table><thead><tr><th>State \\ Input</th>';
+  allSym.forEach(s => html += '<th>' + s + '</th>');
+  html += '</tr></thead><tbody>';
+  nfaStates.forEach(state => {
+    html += '<tr><th>' + state + '</th>';
+    allSym.forEach(sym => {
+      html += '<td><input type="text" id="nfa_' + state + '_' + sym + '" placeholder="-"></td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  document.getElementById('nfaTableArea').innerHTML = html;
+  document.getElementById('nfaSection').style.display = 'block';
+  ['stepsSection','dfaSection','dfaDiagramSection','nfaDiagramSection','testSection'].forEach(id => document.getElementById(id).style.display = 'none');
+}
+
+// ===== READ NFA =====
+function readNFAFromTable() {
+  nfaStartState = document.getElementById('startState').value;
+  nfaFinalStates = [];
+  document.querySelectorAll('.final-check').forEach(cb => { if (cb.checked) nfaFinalStates.push(cb.value); });
+  if (!nfaFinalStates.length) { alert('Select at least one final state.'); return false; }
+
+  let allSym = [...nfaSymbols];
+  if (nfaHasEpsilon) allSym.push('ε');
+  nfaTransitions = {};
+
+  for (const state of nfaStates) {
+    for (const sym of allSym) {
+      const val = document.getElementById('nfa_' + state + '_' + sym).value.trim();
+      const key = state + ',' + sym;
+      if (!val || val === '-' || val === '∅') { nfaTransitions[key] = []; continue; }
+      const targets = val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      for (const t of targets) {
+        if (!nfaStates.includes(t)) { alert('Invalid state "' + t + '" in δ(' + state + ',' + sym + '). Valid: ' + nfaStates.join(',')); return false; }
+      }
+      nfaTransitions[key] = targets;
+    }
+  }
+  return true;
+}
+
+// ===== EPSILON CLOSURE & MOVE =====
+function epsilonClosure(stateSet) {
+  if (!nfaHasEpsilon) return [...stateSet].sort();
+  const stack = [...stateSet]; const closure = new Set(stateSet);
+  while (stack.length) {
+    const st = stack.pop();
+    (nfaTransitions[st + ',ε'] || []).forEach(t => { if (!closure.has(t)) { closure.add(t); stack.push(t); } });
+  }
+  return [...closure].sort();
+}
+function move(stateSet, symbol) {
+  const result = new Set();
+  stateSet.forEach(st => (nfaTransitions[st + ',' + symbol] || []).forEach(t => result.add(t)));
+  return [...result].sort();
+}
+function setKey(a) { return a.length ? a.join(',') : '∅'; }
+function prettySet(a) { return (!a || !a.length) ? '∅' : '{' + a.join(', ') + '}'; }
+
+// ===== SUBSET CONSTRUCTION =====
+function convertNFAtoDFA() {
+  if (!readNFAFromTable()) return;
+  const steps = [];
+  const alpha = [...nfaSymbols];
+
+  const startClosure = epsilonClosure([nfaStartState]);
+  steps.push({ title: 'ε-closure of start state', detail: 'ε-closure({' + nfaStartState + '}) = ' + prettySet(startClosure) });
+
+  const dfaMap = new Map();
+  const startKey = setKey(startClosure);
+  dfaMap.set(startKey, { states: startClosure, transitions: {} });
+  const unmarked = [startKey];
+  const processed = new Set();
+
+  while (unmarked.length) {
+    const ck = unmarked.shift();
+    if (processed.has(ck)) continue;
+    processed.add(ck);
+    const cs = dfaMap.get(ck).states;
+
+    for (const sym of alpha) {
+      const moved = move(cs, sym);
+      const closed = moved.length ? epsilonClosure(moved) : [];
+      const nk = setKey(closed);
+      let d = 'δ_D(' + prettySet(cs) + ', ' + sym + '): move=' + prettySet(moved);
+      if (nfaHasEpsilon && moved.length) d += ' → ε-closure=' + prettySet(closed);
+      const isNew = nk !== '∅' && !dfaMap.has(nk);
+      if (isNew) d += '  [NEW STATE]';
+      steps.push({ title: 'Process ' + prettySet(cs) + ' on "' + sym + '"', detail: d });
+      dfaMap.get(ck).transitions[sym] = nk;
+      if (nk !== '∅' && !dfaMap.has(nk)) { dfaMap.set(nk, { states: closed, transitions: {} }); unmarked.push(nk); }
+    }
+  }
+
+  // Dead state
+  let hasDead = false;
+  dfaMap.forEach(e => alpha.forEach(s => { if (!e.transitions[s] || e.transitions[s] === '∅') { e.transitions[s] = '∅'; hasDead = true; } }));
+  if (hasDead && !dfaMap.has('∅')) {
+    const dt = {}; alpha.forEach(s => dt[s] = '∅');
+    dfaMap.set('∅', { states: [], transitions: dt });
+    steps.push({ title: 'Add Dead/Trap State', detail: 'State ∅ for undefined transitions.' });
+  }
+
+  // Name map
+  const nameMap = new Map(); let idx = 0;
+  dfaMap.forEach((_, k) => nameMap.set(k, k === '∅' ? 'D_dead' : 'D' + idx++));
+
+  // Build result
+  const dfaStates = [], dfaTrans = [], dfaFinal = [];
+  const dfaStart = nameMap.get(startKey);
+  dfaMap.forEach((e, k) => {
+    const nm = nameMap.get(k);
+    dfaStates.push({ name: nm, nfaStates: e.states, key: k });
+    if (e.states.some(s => nfaFinalStates.includes(s))) dfaFinal.push(nm);
+    alpha.forEach(s => dfaTrans.push({ from: nm, symbol: s, to: nameMap.get(e.transitions[s]) || 'D_dead' }));
+  });
+
+  steps.push({ title: 'Conversion Complete!', detail: 'DFA: ' + dfaStates.length + ' states, Start: ' + dfaStart + ', Final: {' + dfaFinal.join(', ') + '}' });
+
+  dfaResult = { states: dfaStates, alphabet: alpha, transitions: dfaTrans, startState: dfaStart, finalStates: dfaFinal, nameMap };
+  renderSteps(steps); renderDFATable(); drawNFADiagram(); drawDFADiagram();
+  document.getElementById('testSection').style.display = 'block';
+}
+
+// ===== RENDER =====
+function renderSteps(steps) {
+  let h = '';
+  steps.forEach((s, i) => h += '<div class="step-box"><strong>Step ' + (i+1) + ': ' + s.title + '</strong><br><pre style="margin:5px 0 0;white-space:pre-wrap;">' + s.detail + '</pre></div>');
+  document.getElementById('stepsArea').innerHTML = h;
+  document.getElementById('stepsSection').style.display = 'block';
+}
+
+function renderDFATable() {
+  if (!dfaResult) return;
+  const a = dfaResult.alphabet;
+  let h = '<table><thead><tr><th>DFA State</th><th>NFA States</th>';
+  a.forEach(s => h += '<th>' + s + '</th>');
+  h += '</tr></thead><tbody>';
+  dfaResult.states.forEach(st => {
+    const isS = st.name === dfaResult.startState, isF = dfaResult.finalStates.includes(st.name);
+    let p = ''; if (isS) p += '→ '; if (isF) p += '* ';
+    h += '<tr' + (isF ? ' class="highlight"' : '') + '><th>' + p + st.name + '</th><td>' + prettySet(st.nfaStates) + '</td>';
+    a.forEach(s => { const t = dfaResult.transitions.find(tr => tr.from === st.name && tr.symbol === s); h += '<td>' + (t ? t.to : '—') + '</td>'; });
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  h += '<p><strong>Start:</strong> ' + dfaResult.startState + ' &nbsp;|&nbsp; <strong>Final States:</strong> {' + dfaResult.finalStates.join(', ') + '}</p>';
+  document.getElementById('dfaTableArea').innerHTML = h;
+  document.getElementById('dfaSection').style.display = 'block';
+}
+
+// ===== CANVAS DRAWING =====
+function getPositions(names, cx, cy, r) {
+  const pos = {};
+  if (names.length === 1) { pos[names[0]] = { x: cx, y: cy }; return pos; }
+  names.forEach((s, i) => {
+    const ang = (2 * Math.PI * i / names.length) - Math.PI / 2;
+    pos[s] = { x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) };
+  });
+  return pos;
+}
+
+function drawArrowLine(ctx, x1, y1, x2, y2, R) {
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const sx = x1 + R * Math.cos(ang), sy = y1 + R * Math.sin(ang);
+  const ex = x2 - R * Math.cos(ang), ey = y2 - R * Math.sin(ang);
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+  const hl = 10;
+  ctx.beginPath(); ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - hl * Math.cos(ang - 0.3), ey - hl * Math.sin(ang - 0.3));
+  ctx.lineTo(ex - hl * Math.cos(ang + 0.3), ey - hl * Math.sin(ang + 0.3));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawCurved(ctx, x1, y1, x2, y2, R, label, curve) {
+  const dx = x2 - x1, dy = y2 - y1, d = Math.sqrt(dx*dx + dy*dy) || 1;
+  const mx = (x1+x2)/2 + (-dy/d)*curve, my = (y1+y2)/2 + (dx/d)*curve;
+  const sa = Math.atan2(my-y1, mx-x1), ea = Math.atan2(my-y2, mx-x2);
+  const sx = x1 + R*Math.cos(sa), sy = y1 + R*Math.sin(sa);
+  const ex = x2 + R*Math.cos(ea), ey = y2 + R*Math.sin(ea);
+
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(mx, my, ex, ey); ctx.stroke();
+  const tx = 2*(ex - mx), ty = 2*(ey - my), ta = Math.atan2(ty, tx); const hl = 10;
+  ctx.beginPath(); ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - hl*Math.cos(ta-0.3), ey - hl*Math.sin(ta-0.3));
+  ctx.lineTo(ex - hl*Math.cos(ta+0.3), ey - hl*Math.sin(ta+0.3));
+  ctx.closePath(); ctx.fill();
+
+  ctx.save(); ctx.fillStyle = '#d32f2f'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+  ctx.fillText(label, mx, my - 5); ctx.restore();
+}
+
+function drawSelfLoop(ctx, x, y, R, label) {
+  // Draw loop on top of the node
+  const loopR = 18;
+  const centerY = y - R - loopR;
+
+  ctx.beginPath();
+  // Draw arc starting from right side, going counter-clockwise (full circle minus small gap for arrowhead)
+  ctx.arc(x, centerY, loopR, 0.5, Math.PI * 2 - 0.5, false);
+  ctx.stroke();
+
+  // Arrowhead: the arc ends at angle -0.5 (= 2π - 0.5), so arrowhead points INTO the node
+  const endAngle = Math.PI * 2 - 0.5;
+  const ax = x + loopR * Math.cos(endAngle);
+  const ay = centerY + loopR * Math.sin(endAngle);
+
+  // Tangent direction at end of arc (going clockwise at end point) — should point downward toward node
+  const tangentAngle = endAngle + Math.PI / 2;
+  const hl = 9;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax - hl * Math.cos(tangentAngle - 0.35), ay - hl * Math.sin(tangentAngle - 0.35));
+  ctx.lineTo(ax - hl * Math.cos(tangentAngle + 0.35), ay - hl * Math.sin(tangentAngle + 0.35));
+  ctx.closePath();
+  ctx.fill();
+
+  // Label above the loop
+  ctx.save();
+  ctx.fillStyle = '#d32f2f';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x, centerY - loopR - 5);
+  ctx.restore();
+}
+
+function drawDiagram(canvasId, stateNames, transitions, startState, finalStates, subtitles) {
+  const cv = document.getElementById(canvasId);
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  if (!stateNames.length) return;
+
+  const R = 25;
+  const layoutR = Math.min(W, H) * 0.32;
+  const pos = getPositions(stateNames, W/2, H/2, layoutR);
+
+  ctx.strokeStyle = '#555'; ctx.fillStyle = '#333'; ctx.lineWidth = 1.5;
+
+  // Group edges
+  const eMap = {};
+  transitions.forEach(t => { const k = t.from + '->' + t.to; if (!eMap[k]) eMap[k] = []; eMap[k].push(t.symbol); });
+  const biDir = new Set();
+  Object.keys(eMap).forEach(k => { const [f, t] = k.split('->'); if (f !== t && eMap[t + '->' + f]) biDir.add(k); });
+
+  // Draw edges
+  Object.entries(eMap).forEach(([key, syms]) => {
+    const [from, to] = key.split('->');
+    const label = syms.join(',');
+    if (!pos[from] || !pos[to]) return;
+
+    ctx.strokeStyle = '#555'; ctx.fillStyle = '#333'; ctx.lineWidth = 1.5;
+
+    if (from === to) {
+      drawSelfLoop(ctx, pos[from].x, pos[from].y, R, label);
+    } else if (biDir.has(key)) {
+      const c = key < (to + '->' + from) ? 35 : -35;
+      drawCurved(ctx, pos[from].x, pos[from].y, pos[to].x, pos[to].y, R, label, c);
+    } else {
+      drawArrowLine(ctx, pos[from].x, pos[from].y, pos[to].x, pos[to].y, R);
+      const mx = (pos[from].x + pos[to].x)/2, my = (pos[from].y + pos[to].y)/2;
+      const dx = pos[to].x - pos[from].x, dy = pos[to].y - pos[from].y, d = Math.sqrt(dx*dx+dy*dy)||1;
+      ctx.save(); ctx.fillStyle = '#d32f2f'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
+      ctx.fillText(label, mx + (-dy/d)*15, my + (dx/d)*15); ctx.restore();
+    }
+  });
+
+  // Draw nodes
+  stateNames.forEach(s => {
+    const p = pos[s];
+    const isS = s === startState, isF = finalStates.includes(s);
+
+    ctx.strokeStyle = '#555'; ctx.fillStyle = '#333'; ctx.lineWidth = 1.5;
+
+    // Start arrow
+    if (isS) {
+      const ax = p.x - R - 35;
+      ctx.beginPath(); ctx.moveTo(ax, p.y); ctx.lineTo(p.x - R, p.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x - R, p.y);
+      ctx.lineTo(p.x - R - 8, p.y - 5); ctx.lineTo(p.x - R - 8, p.y + 5);
+      ctx.closePath(); ctx.fill();
+    }
+
+    // Final: double circle
+    if (isF) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 5, 0, Math.PI*2);
+      ctx.strokeStyle = '#4CAF50'; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    // Main circle
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI*2);
+    ctx.fillStyle = isF ? '#e8f5e9' : '#e3f2fd'; ctx.fill();
+    ctx.strokeStyle = isF ? '#4CAF50' : '#2196F3'; ctx.lineWidth = 2; ctx.stroke();
+
+    // Name
+    ctx.fillStyle = '#333'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(s, p.x, p.y);
+
+    // Subtitle
+    if (subtitles && subtitles[s]) {
+      ctx.fillStyle = '#888'; ctx.font = '10px Arial'; ctx.textBaseline = 'top';
+      ctx.fillText(subtitles[s], p.x, p.y + R + 8);
+    }
+  });
+}
+
+function drawNFADiagram() {
+  let allSym = [...nfaSymbols]; if (nfaHasEpsilon) allSym.push('ε');
+  const tList = [];
+  nfaStates.forEach(st => allSym.forEach(sym => (nfaTransitions[st + ',' + sym] || []).forEach(t => tList.push({ from: st, symbol: sym, to: t }))));
+  drawDiagram('nfaDiagram', nfaStates, tList, nfaStartState, nfaFinalStates, null);
+  document.getElementById('nfaDiagramSection').style.display = 'block';
+}
+
+function drawDFADiagram() {
+  if (!dfaResult) return;
+  const names = dfaResult.states.map(s => s.name);
+  const subs = {}; dfaResult.states.forEach(s => subs[s.name] = prettySet(s.nfaStates));
+  drawDiagram('dfaDiagram', names, dfaResult.transitions, dfaResult.startState, dfaResult.finalStates, subs);
+  document.getElementById('dfaDiagramSection').style.display = 'block';
+}
+
+// ===== STRING TESTING =====
+function testString() {
+  const input = document.getElementById('testStringInput').value;
+  for (const ch of input) {
+    if (!nfaSymbols.includes(ch)) {
+      document.getElementById('testResultArea').innerHTML = '<div class="error">Symbol "' + ch + '" not in alphabet {' + nfaSymbols.join(',') + '}</div>';
+      return;
+    }
+  }
+  const nR = testNFA(input); let dR = null; if (dfaResult) dR = testDFA(input);
+  let h = '<h3>Results for "' + (input || 'ε') + '"</h3>';
+  h += '<p class="' + (nR.accepted ? 'result-accepted' : 'result-rejected') + '">NFA: ' + (nR.accepted ? '✓ ACCEPTED' : '✗ REJECTED') + '</p>';
+  h += '<p><strong>NFA Trace:</strong> ';
+  nR.trace.forEach((t, i) => { if (i > 0) h += ' —<span style="color:red">' + t.symbol + '</span>→ '; h += prettySet(t.states); });
+  h += '</p>';
+  if (dR) {
+    h += '<p class="' + (dR.accepted ? 'result-accepted' : 'result-rejected') + '">DFA: ' + (dR.accepted ? '✓ ACCEPTED' : '✗ REJECTED') + '</p>';
+    h += '<p><strong>DFA Trace:</strong> ';
+    dR.trace.forEach((t, i) => { if (i > 0) h += ' —<span style="color:red">' + t.symbol + '</span>→ '; h += t.state; });
+    h += '</p>';
+    h += '<div class="info">✓ Both NFA and DFA ' + (nR.accepted ? 'accept' : 'reject') + ' this string.</div>';
+  }
+  document.getElementById('testResultArea').innerHTML = h;
+}
+
+function testNFA(input) {
+  let cur = new Set(epsilonClosure([nfaStartState]));
+  const trace = [{ symbol: 'start', states: [...cur] }];
+  for (const ch of input) {
+    let nxt = new Set();
+    cur.forEach(st => (nfaTransitions[st + ',' + ch] || []).forEach(t => epsilonClosure([t]).forEach(s => nxt.add(s))));
+    cur = nxt; trace.push({ symbol: ch, states: [...cur] });
+  }
+  return { accepted: [...cur].some(s => nfaFinalStates.includes(s)), trace };
+}
+
+function testDFA(input) {
+  let cur = dfaResult.startState;
+  const trace = [{ symbol: 'start', state: cur }];
+  for (const ch of input) {
+    const t = dfaResult.transitions.find(tr => tr.from === cur && tr.symbol === ch);
+    cur = t ? t.to : null; trace.push({ symbol: ch, state: cur || '∅' });
+    if (!cur) break;
+  }
+  return { accepted: cur && dfaResult.finalStates.includes(cur), trace };
+}
+</script>
+</body>
+</html>
