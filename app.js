@@ -891,18 +891,24 @@ function drawSelfLoop(ctx, x, y, r, color, label) {
   const lx = x;
   const ly = y - r - loopR;
 
+  // Gap at bottom of loop (closest to node)
+  const gapAngle = 0.3;
+  const startAngle = Math.PI / 2 + gapAngle;
+  const endAngle = Math.PI / 2 - gapAngle;
+
   ctx.beginPath();
-  ctx.arc(lx, ly, loopR, 0.3, Math.PI * 2 - 0.3);
+  // Clockwise (false) from left-of-gap through top to right-of-gap = nearly full circle
+  ctx.arc(lx, ly, loopR, startAngle, endAngle, false);
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.8;
   ctx.stroke();
 
-  // Arrowhead
+  // Arrowhead at end of arc (right side of gap, pointing into the node)
   const headLen = 8;
-  const aAngle = Math.PI * 2 - 0.3;
-  const ax = lx + loopR * Math.cos(aAngle);
-  const ay = ly + loopR * Math.sin(aAngle);
-  const tangent = aAngle + Math.PI / 2;
+  const ax = lx + loopR * Math.cos(endAngle);
+  const ay = ly + loopR * Math.sin(endAngle);
+  // Clockwise arc tangent at endpoint points toward the node
+  const tangent = endAngle + Math.PI / 2;
   ctx.beginPath();
   ctx.moveTo(ax, ay);
   ctx.lineTo(ax - headLen * Math.cos(tangent - 0.5), ay - headLen * Math.sin(tangent - 0.5));
