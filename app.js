@@ -215,7 +215,9 @@ function getAlphabet() {
 
 function onAlphabetChange() {
   nfa.alphabet = getAlphabet();
+  nfa.transitions = [];   
   refreshSymbolSelect();
+  refreshUI();           
 }
 
 /* ── STATE MANAGEMENT ────────────────────────────────────── */
@@ -254,6 +256,7 @@ function removeAcceptState(name) {
 /* ── TRANSITION MANAGEMENT ───────────────────────────────── */
 
 function addTransition() {
+  dom.selectTransSymbol.blur();
   const from = dom.selectTransFrom.value;
   const symbol = dom.selectTransSymbol.value;
   const to = dom.selectTransTo.value;
@@ -277,9 +280,12 @@ function clearAll() {
   nfa.transitions = [];
   nfa.startState = '';
   nfa.acceptStates = [];
+
+  dom.inputAlphabet.value = '';
+  dom.inputStateName.value = '';
+
   dfaResult = null;
   conversionSteps = [];
-  dom.inputAlphabet.value = '';
   dom.testResults.innerHTML = '';
   refreshUI();
   notify('Cleared all data.', 'info');
