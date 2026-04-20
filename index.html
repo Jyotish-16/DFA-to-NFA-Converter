@@ -352,17 +352,21 @@ function drawSelfLoop(ctx, x, y, R, label) {
   const loopR = 18;
   const centerY = y - R - loopR;
 
+  // Gap at bottom of loop (closest to node)
+  const gapAngle = 0.5;
+  const startAngle = Math.PI / 2 + gapAngle;
+  const endAngle = Math.PI / 2 - gapAngle;
+
   ctx.beginPath();
-  // Draw arc starting from right side, going counter-clockwise (full circle minus small gap for arrowhead)
-  ctx.arc(x, centerY, loopR, 0.5, Math.PI * 2 - 0.5, false);
+  // Clockwise (false) from left-of-gap through top to right-of-gap = nearly full circle
+  ctx.arc(x, centerY, loopR, startAngle, endAngle, false);
   ctx.stroke();
 
-  // Arrowhead: the arc ends at angle -0.5 (= 2π - 0.5), so arrowhead points INTO the node
-  const endAngle = Math.PI * 2 - 0.5;
+  // Arrowhead at end of arc (right side of gap, pointing into the node)
   const ax = x + loopR * Math.cos(endAngle);
   const ay = centerY + loopR * Math.sin(endAngle);
 
-  // Tangent direction at end of arc (going clockwise at end point) — should point downward toward node
+  // Clockwise arc tangent at endpoint points toward the node
   const tangentAngle = endAngle + Math.PI / 2;
   const hl = 9;
   ctx.beginPath();
@@ -389,8 +393,9 @@ function drawDiagram(canvasId, stateNames, transitions, startState, finalStates,
   if (!stateNames.length) return;
 
   const R = 25;
-  const layoutR = Math.min(W, H) * 0.32;
-  const pos = getPositions(stateNames, W/2, H/2, layoutR);
+  const loopSpace = 30; // extra space for self-loops above top nodes
+  const layoutR = Math.min(W, H) * 0.28;
+  const pos = getPositions(stateNames, W/2, H/2 + loopSpace/2, layoutR);
 
   ctx.strokeStyle = '#555'; ctx.fillStyle = '#333'; ctx.lineWidth = 1.5;
 
